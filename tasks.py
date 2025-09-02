@@ -1,31 +1,15 @@
-from datetime import datetime, timedelta
-
 from celery import Celery
-from time import sleep
+import random
 
 app = Celery('tasks', broker='redis://localhost:6379', backend='redis://localhost:6379')# брокер )
 
-# celery -A tasks worker -l info --pool=solo запуск
-# process.delay(2,3) запуск python -i tasks.py   
-@app.task
-def process(x, y):
-    i = 0
-    while i < 5:
-        sleep(1)
-        i += 1
-        print('Обработка')
-
-    return x**2 + y**2
+# Retry(повтор задачи)
 
 
-# Пример с apply_async
-'''
-это сахар delay но с большим выбором действий
-
-
-# выполнится через 10 секунд
-process.apply_async((2, 3), countdown=10)
-'''
-
-if __name__ == '__main__':
-    print(process.apply_async((2, 3), expires=60))
+@app.task(bind=True, max_retries=3, default_retry_delay=5)
+# максимум 3 попытки,пауза 5 сек
+def unstable_task(self):
+    if random.choice([True, False]):
+        print('Упало проем снова')
+        raise self.retry(exc=Exception('Случайная ошибка')) # повтор задачи
+    return "Успех"
